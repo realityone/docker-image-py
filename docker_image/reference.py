@@ -42,7 +42,7 @@ class NameTooLong(ReferenceError):
 
 
 class Reference(dict):
-    def __init__(self, name, tag=None, digest=None):
+    def __init__(self, name=None, tag=None, digest=None):
         super(Reference, self).__init__()
         self['name'] = name
         self['tag'] = tag
@@ -60,7 +60,7 @@ class Reference(dict):
         if not self['tag']:
             if self['digest']:
                 return CanonicalReference(self['name'], self['digest'])
-            return NameReference(self['name'])
+            return NamedReference(self['name'])
 
         if not self['digest']:
             return TaggedReference(self['name'], self['tag'])
@@ -77,7 +77,7 @@ class Reference(dict):
         if len(matches[0]) > NAME_TOTAL_LENGTH_MAX:
             raise NameTooLong.default()
 
-        ref = Reference(matches[0], tag=matches[1])
+        ref = Reference(name=matches[0], tag=matches[1])
         if matches[2]:
             # validate digest
             ref['digest'] = matches[2]
@@ -89,25 +89,42 @@ class Reference(dict):
         return r
 
 
-class CanonicalReference(Reference):
-    def __init__(self, name, digest):
-        super(CanonicalReference, self).__init__(name, digest=digest)
+class NamedReference(Reference):
+    def __init__(self, name, **kwargs):
+        super(NamedReference, self).__init__(name=name, **kwargs)
+
+    def string(self):
+        return '{}'.format(self['name'])
+
+    def split_hostname(self):
+        name = self['name']
+        matched = ImageRegexps.ANCHORED_NAME_REGEXP.match(name)
+
+        if not matched:
+            return '', name
+        matches = matched.groups()
+        if len(matches) != 2:
+            return '', name
+
+        return matches[0], matches[1]
+
+
+class DigestReference(Reference):
+    def __init__(self, digest):
+        super(DigestReference, self).__init__(digest=digest)
+
+
+class CanonicalReference(NamedReference):
+    def __init__(self, name, digest, **kwargs):
+        super(CanonicalReference, self).__init__(name=name, digest=digest, **kwargs)
 
     def string(self):
         return '{}@{}'.format(self['name'], self['digest'])
 
 
-class NameReference(Reference):
-    def __init__(self, name):
-        super(NameReference, self).__init__(name)
-
-    def string(self):
-        return '{}'.format(self['name'])
-
-
-class TaggedReference(Reference):
-    def __init__(self, name, tag):
-        super(TaggedReference, self).__init__(name, tag=tag)
+class TaggedReference(NamedReference):
+    def __init__(self, name, tag, **kwargs):
+        super(TaggedReference, self).__init__(name=name, tag=tag, **kwargs)
 
     def string(self):
         return '{}:{}'.format(self['name'], self['tag'])
