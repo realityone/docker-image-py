@@ -5,37 +5,37 @@ ImageRegexps = regexp.ImageRegexps
 NAME_TOTAL_LENGTH_MAX = 255
 
 
-class ReferenceError(Exception):
+class InvalidReference(Exception):
     @classmethod
     def default(cls):
-        return cls("reference error")
+        return cls("invalid reference")
 
 
-class ReferenceInvalidFormat(ReferenceError):
+class ReferenceInvalidFormat(InvalidReference):
     @classmethod
     def default(cls):
         return cls("invalid reference format")
 
 
-class TagInvalidFormat(ReferenceError):
+class TagInvalidFormat(InvalidReference):
     @classmethod
     def default(cls):
         return cls("invalid tag format")
 
 
-class DigestInvalidFormat(ReferenceError):
+class DigestInvalidFormat(InvalidReference):
     @classmethod
     def default(cls):
         return cls("invalid digest format")
 
 
-class NameEmpty(ReferenceError):
+class NameEmpty(InvalidReference):
     @classmethod
     def default(cls):
         return cls("repository name must have at least one component")
 
 
-class NameTooLong(ReferenceError):
+class NameTooLong(InvalidReference):
     @classmethod
     def default(cls):
         return cls("repository name must not be more than {} characters".format(NAME_TOTAL_LENGTH_MAX))
