@@ -1,20 +1,9 @@
+from . import digest as digest_
 from . import regexp
 
 ImageRegexps = regexp.ImageRegexps
 
 NAME_TOTAL_LENGTH_MAX = 255
-
-
-class InvalidDigest(Exception):
-    @classmethod
-    def default(cls):
-        return cls("invalid digest")
-
-
-class DigestUnsupported(InvalidDigest):
-    @classmethod
-    def default(cls):
-        return cls("unsupported digest algorithm")
 
 
 class InvalidReference(Exception):
@@ -103,9 +92,9 @@ class Reference(dict):
         if len(matches[0]) > NAME_TOTAL_LENGTH_MAX:
             raise NameTooLong.default()
 
-        ref = Reference(name=matches[0], tag=matches[1])
+        ref = cls(name=matches[0], tag=matches[1])
         if matches[2]:
-            # validate digest
+            digest_.validate_digest(matches[2])
             ref['digest'] = matches[2]
 
         r = ref.best_reference()
@@ -124,8 +113,8 @@ class NamedReference(Reference):
 
 
 class DigestReference(Reference):
-    def __init__(self, digest):
-        super(DigestReference, self).__init__(digest=digest)
+    def __init__(self, digest, **kwargs):
+        super(DigestReference, self).__init__(digest=digest, **kwargs)
 
     def string(self):
         return self['digest']

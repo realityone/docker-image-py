@@ -1,5 +1,6 @@
 import unittest
 
+from docker_image import digest
 from docker_image import reference
 
 
@@ -30,22 +31,20 @@ class TestReference(unittest.TestCase):
             create_test_case(input_='', err=reference.NameEmpty),
             create_test_case(input_=':justtag', err=reference.ReferenceInvalidFormat),
             create_test_case(input_='@sha256:{}'.format('f' * 64), err=reference.ReferenceInvalidFormat),
-            # TODO: validate digest
-            # create_test_case(input_='repo@sha256:{}'.format('f' * 34), err=reference.DigestInvalidFormat),
-            # create_test_case(input_='validname@invaliddigest:{}'.format('f' * 64), err=reference.DigestUnsupported),
-            # create_test_case(input_='{}:tag'.format('a/' * 128), err=reference.NameTooLong),
+            create_test_case(input_='repo@sha256:{}'.format('f' * 34), err=digest.DigestInvalidLength),
+            create_test_case(input_='validname@invaliddigest:{}'.format('f' * 64), err=digest.DigestUnsupported),
+            create_test_case(input_='{}a:tag'.format('a/' * 128), err=reference.NameTooLong),
             create_test_case(input_='{}a:tag-puts-this-over-max'.format('a/' * 127), repository='{}a'.format('a/' * 127),
                              hostname='a', tag='tag-puts-this-over-max'),
             create_test_case(input_='aa/asdf$$^/aa', err=reference.ReferenceInvalidFormat),
             create_test_case(input_='sub-dom1.foo.com/bar/baz/quux', repository='sub-dom1.foo.com/bar/baz/quux',
                              hostname='sub-dom1.foo.com'),
             create_test_case(input_='sub-dom1.foo.com/bar/baz/quux:some-long-tag', repository='sub-dom1.foo.com/bar/baz/quux',
-                             hostname='sub-dom1.foo.com', tag='some-long-tag', digest=''),
+                             hostname='sub-dom1.foo.com', tag='some-long-tag'),
             create_test_case(input_='b.gcr.io/test.example.com/my-app:test.example.com',
-                             repository='b.gcr.io/test.example.com/my-app', hostname='b.gcr.io', tag='test.example.com',
-                             digest=''),
+                             repository='b.gcr.io/test.example.com/my-app', hostname='b.gcr.io', tag='test.example.com'),
             create_test_case(input_='xn--n3h.com/myimage:xn--n3h.com', repository='xn--n3h.com/myimage', hostname='xn--n3h.com',
-                             tag='xn--n3h.com', digest=''),
+                             tag='xn--n3h.com'),
             create_test_case(input_='xn--7o8h.com/myimage:xn--7o8h.com@sha512:{}'.format('f' * 128),
                              repository='xn--7o8h.com/myimage', hostname='xn--7o8h.com', tag='xn--7o8h.com',
                              digest='sha512:{}'.format('f' * 128)),

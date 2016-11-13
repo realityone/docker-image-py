@@ -71,3 +71,8 @@ class ImageRegexps(object):
         optional(literal(r':'), capture(TAG_REGEXP)),
         optional(literal(r'@'), capture(DIGEST_REGEXP))
     )
+
+
+class DigestRegexps(object):
+    DIGEST_REGEXP = match(r'[a-zA-Z0-9-_+.]+:[a-fA-F0-9]+')
+    DIGEST_REGEXP_ANCHORED = anchored(DIGEST_REGEXP)
