@@ -11,7 +11,7 @@ with open(os.path.join(SOURCE_DIR, 'requirements.txt'), 'r') as f:
 
 setup(
     name="docker-image-py",
-    version='0.1.1',
+    version='0.1.2',
     description="Parse docker image as distribution does.",
     url='https://github.com/realityone/docker-image-py',
     packages=['docker_image'],

@@ -35,6 +35,10 @@ $ pip install https://github.com/realityone/docker-image-py/archive/master.zip
 ... )
 >>> print ref
 {'tag': None, 'name': 'daocloud.io/nginx', 'digest': None}
+>>> # get registry hostname
+>>> hostname, name = ref.split_hostname()
+>>> print 'hostname: {}, name: {}'.format(hostname, name)
+hostname: daocloud.io, name: nginx
 >>> # with registry, repo and tag
 >>> ref = reference.Reference.parse(
 ...     'daocloud.io/nginx:latest'
