@@ -1,15 +1,15 @@
-import re
+import regex
 
 
 def _quote_meta(s):
-    special_chars = r'\.+*?()|[]{}^$'
+    special_chars = regex._METACHARS
     escape = lambda c: r'\{}'.format(c) if c in special_chars else c
     sp = (escape(c) for c in s)
     return r''.join(sp)
 
 
 def match(regexp):
-    return re.compile(regexp)
+    return regex.compile(regexp)
 
 
 def literal(s):

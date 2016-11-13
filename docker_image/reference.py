@@ -5,6 +5,18 @@ ImageRegexps = regexp.ImageRegexps
 NAME_TOTAL_LENGTH_MAX = 255
 
 
+class InvalidDigest(Exception):
+    @classmethod
+    def default(cls):
+        return cls("invalid digest")
+
+
+class DigestUnsupported(InvalidDigest):
+    @classmethod
+    def default(cls):
+        return cls("unsupported digest algorithm")
+
+
 class InvalidReference(Exception):
     @classmethod
     def default(cls):
@@ -48,13 +60,25 @@ class Reference(dict):
         self['tag'] = tag
         self['digest'] = digest
 
+    def split_hostname(self):
+        name = self['name']
+        matched = ImageRegexps.ANCHORED_NAME_REGEXP.match(name)
+
+        if not matched:
+            return '', name
+        matches = matched.groups()
+        if len(matches) != 2:
+            return '', name
+
+        return matches[0], matches[1]
+
     def string(self):
         return '{}:{}@{}'.format(self['name'], self['tag'], self['digest'])
 
     def best_reference(self):
         if not self['name']:
-            if not self['digest']:
-                return self['digest']
+            if self['digest']:
+                return DigestReference(self['digest'])
             return None
 
         if not self['tag']:
@@ -64,6 +88,8 @@ class Reference(dict):
 
         if not self['digest']:
             return TaggedReference(self['name'], self['tag'])
+
+        return self
 
     @classmethod
     def parse(cls, s):
@@ -96,22 +122,13 @@ class NamedReference(Reference):
     def string(self):
         return '{}'.format(self['name'])
 
-    def split_hostname(self):
-        name = self['name']
-        matched = ImageRegexps.ANCHORED_NAME_REGEXP.match(name)
-
-        if not matched:
-            return '', name
-        matches = matched.groups()
-        if len(matches) != 2:
-            return '', name
-
-        return matches[0], matches[1]
-
 
 class DigestReference(Reference):
     def __init__(self, digest):
         super(DigestReference, self).__init__(digest=digest)
+
+    def string(self):
+        return self['digest']
 
 
 class CanonicalReference(NamedReference):
