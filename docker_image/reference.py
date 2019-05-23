@@ -81,10 +81,21 @@ class Reference(dict):
         return self
 
     @classmethod
-    def parse(cls, s):
-        matched = ImageRegexps.REFERENCE_REGEXP.match(s)
-        if not matched and not s:
+    def try_validate(cls, s):
+        if not s:
             raise NameEmpty.default()
+        if '/' not in s:
+            return
+        hostname, _ = s.split('/', 1)
+        matched = ImageRegexps.ANCHORED_HOSTNAME_REGEXP.match(hostname)
+        if not matched:
+            raise ReferenceInvalidFormat.default()
+
+    @classmethod
+    def parse(cls, s):
+        cls.try_validate(s)
+
+        matched = ImageRegexps.REFERENCE_REGEXP.match(s)
         if not matched:
             raise ReferenceInvalidFormat.default()
 

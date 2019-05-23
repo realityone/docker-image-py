@@ -50,6 +50,7 @@ class TestReference(unittest.TestCase):
                              digest='sha512:{}'.format('f' * 128)),
             create_test_case(input_='foo_bar.com:8080', repository='foo_bar.com', tag='8080'),
             create_test_case(input_='foo/foo_bar.com:8080', repository='foo/foo_bar.com', hostname='foo', tag='8080'),
+            create_test_case(input_='123.dkr.ecr.eu-west-1.amazonaws.com:lol/abc:d', err=reference.ReferenceInvalidFormat),
         ]
 
         for tc in test_cases:
