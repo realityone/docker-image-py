@@ -7,12 +7,12 @@ ROOT_DIR = os.path.dirname(__file__)
 SOURCE_DIR = os.path.join(ROOT_DIR)
 
 install_requires = [
-    'regex>=2017.7.28',
+    'regex>=2019.4.14',
 ]
 
 setup(
     name="docker-image-py",
-    version='0.1.4',
+    version='0.1.5',
     description="Parse docker image as distribution does.",
     url='https://github.com/realityone/docker-image-py',
     packages=['docker_image'],

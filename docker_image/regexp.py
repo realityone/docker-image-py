@@ -53,6 +53,7 @@ class ImageRegexps(object):
         optional(repeated(literal(r'.'), HOSTNAME_COMPONENT_REGEXP)),
         optional(literal(r':'), match(r'[0-9]+'))
     )
+    ANCHORED_HOSTNAME_REGEXP = anchored(HOSTNAME_REGEXP)
     TAG_REGEXP = match(r'[\w][\w.-]{0,127}')
     ANCHORED_TAG_REGEXP = anchored(TAG_REGEXP)
     DIGEST_REGEXP = match(r'[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}')
