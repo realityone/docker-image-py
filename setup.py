@@ -12,7 +12,7 @@ install_requires = [
 
 setup(
     name="docker-image-py",
-    version='0.1.5',
+    version='0.1.10',
     description="Parse docker image as distribution does.",
     url='https://github.com/realityone/docker-image-py',
     packages=['docker_image'],

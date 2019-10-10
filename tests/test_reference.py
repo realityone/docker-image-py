@@ -75,3 +75,157 @@ class TestReference(unittest.TestCase):
 
                 if tc['digest']:
                     self.assertEqual(tc['digest'], r['digest'])
+
+
+class TestNormalize(unittest.TestCase):
+    def test_parse_repository_info(self):
+        def create_test_case(remote_name, familiar_name, full_name, ambiguous_name, domain):
+            return {
+                'remote_name': remote_name,
+                'familiar_name': familiar_name,
+                'full_name': full_name,
+                'ambiguous_name': ambiguous_name,
+                'domain': domain,
+            }
+
+        test_cases = [
+            create_test_case('fooo/bar', 'fooo/bar', 'docker.io/fooo/bar', 'index.docker.io/fooo/bar', 'docker.io'),
+            create_test_case('library/ubuntu', 'ubuntu', 'docker.io/library/ubuntu', 'library/ubuntu', 'docker.io'),
+            create_test_case('nonlibrary/ubuntu', 'nonlibrary/ubuntu', 'docker.io/nonlibrary/ubuntu', '', 'docker.io'),
+            create_test_case('other/library', 'other/library', 'docker.io/other/library', '', 'docker.io'),
+            create_test_case('private/moonbase', '127.0.0.1:8000/private/moonbase', '127.0.0.1:8000/private/moonbase', '',
+                             '127.0.0.1:8000'),
+            create_test_case('privatebase', '127.0.0.1:8000/privatebase', '127.0.0.1:8000/privatebase', '', '127.0.0.1:8000'),
+            create_test_case('private/moonbase', 'example.com/private/moonbase', 'example.com/private/moonbase', '',
+                             'example.com'),
+            create_test_case('privatebase', 'example.com/privatebase', 'example.com/privatebase', '', 'example.com'),
+            create_test_case('private/moonbase', 'example.com:8000/private/moonbase', 'example.com:8000/private/moonbase', '',
+                             'example.com:8000'),
+            create_test_case('privatebasee', 'example.com:8000/privatebasee', 'example.com:8000/privatebasee', '',
+                             'example.com:8000'),
+            create_test_case('library/ubuntu-12.04-base', 'ubuntu-12.04-base', 'docker.io/library/ubuntu-12.04-base',
+                             'index.docker.io/library/ubuntu-12.04-base', 'docker.io'),
+            create_test_case('library/foo', 'foo', 'docker.io/library/foo', 'docker.io/foo', 'docker.io'),
+            create_test_case('library/foo/bar', 'library/foo/bar', 'docker.io/library/foo/bar', '', 'docker.io'),
+            create_test_case('store/foo/bar', 'store/foo/bar', 'docker.io/store/foo/bar', '', 'docker.io'),
+        ]
+        for tc in test_cases:
+            ref_strings = [tc['familiar_name'], tc['full_name']]
+            if tc['ambiguous_name'] != '':
+                ref_strings.append(tc['ambiguous_name'])
+
+            refs = []
+            for r in ref_strings:
+                try:
+                    named = reference.Reference.parse_normalized_named(r)
+                except Exception as e:
+                    raise e
+                refs.append(named)
+
+            for r in refs:
+                self.assertEqual(tc['familiar_name'], r.familiar_name())
+                self.assertEqual(tc['full_name'], r.string())
+                self.assertEqual(tc['domain'], r.domain())
+                self.assertEqual(tc['remote_name'], r.path())
+
+    def test_validate_reference_name(self):
+        valid_repo_names = [
+            "docker/docker",
+            "library/debian",
+            "debian",
+            "docker.io/docker/docker",
+            "docker.io/library/debian",
+            "docker.io/debian",
+            "index.docker.io/docker/docker",
+            "index.docker.io/library/debian",
+            "index.docker.io/debian",
+            "127.0.0.1:5000/docker/docker",
+            "127.0.0.1:5000/library/debian",
+            "127.0.0.1:5000/debian",
+            "thisisthesongthatneverendsitgoesonandonandonthisisthesongthatnev",
+
+            # This test case was moved from invalid to valid since it is valid input
+            # when specified with a hostname, it removes the ambiguity from about
+            # whether the value is an identifier or repository name
+            "docker.io/1a3f5e7d9c1b3a5f7e9d1c3b5a7f9e1d3c5b7a9f1e3d5d7c9b1a3f5e7d9c1b3a",
+        ]
+        invalid_repo_names = [
+            "https://github.com/docker/docker",
+            "docker/Docker",
+            "-docker",
+            "-docker/docker",
+            "-docker.io/docker/docker",
+            "docker///docker",
+            "docker.io/docker/Docker",
+            "docker.io/docker///docker",
+            "1a3f5e7d9c1b3a5f7e9d1c3b5a7f9e1d3c5b7a9f1e3d5d7c9b1a3f5e7d9c1b3a",
+        ]
+        for name in valid_repo_names:
+            ref = reference.Reference.parse_normalized_named(name)
+            self.assertIsNotNone(ref)
+
+        for name in invalid_repo_names:
+            self.assertRaises(reference.InvalidReference, reference.Reference.parse_normalized_named, name)
+
+    def test_validate_remote_name(self):
+        valid_repository_names = [
+            # Sanity check.
+            "docker/docker",
+
+            # Allow 64-character non-hexadecimal names (hexadecimal names are forbidden).
+            "thisisthesongthatneverendsitgoesonandonandonthisisthesongthatnev",
+
+            # Allow embedded hyphens.
+            "docker-rules/docker",
+
+            # Allow multiple hyphens as well.
+            "docker---rules/docker",
+
+            # Username doc and image name docker being tested.
+            "doc/docker",
+
+            # single character names are now allowed.
+            "d/docker",
+            "jess/t",
+
+            # Consecutive underscores.
+            "dock__er/docker",
+        ]
+        invalid_repository_names = [
+            # Disallow capital letters.
+            "docker/Docker",
+
+            # Only allow one slash.
+            "docker///docker",
+
+            # Disallow 64-character hexadecimal.
+            "1a3f5e7d9c1b3a5f7e9d1c3b5a7f9e1d3c5b7a9f1e3d5d7c9b1a3f5e7d9c1b3a",
+
+            # Disallow leading and trailing hyphens in namespace.
+            "-docker/docker",
+            "docker-/docker",
+            "-docker-/docker",
+
+            # Don't allow underscores everywhere (as opposed to hyphens).
+            "____/____",
+
+            "_docker/_docker",
+
+            # Disallow consecutive periods.
+            "dock..er/docker",
+            "dock_.er/docker",
+            "dock-.er/docker",
+
+            # No repository.
+            "docker/",
+
+            # namespace too long
+            "this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255_this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255_this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255_this_is_not_a_valid_namespace_because_its_lenth_is_greater_than_255/docker",
+        ]
+
+        for name in valid_repository_names:
+            ref = reference.Reference.parse_normalized_named(name)
+            self.assertIsNotNone(ref)
+
+        for name in invalid_repository_names:
+            self.assertRaises(reference.InvalidReference, reference.Reference.parse_normalized_named, name)
