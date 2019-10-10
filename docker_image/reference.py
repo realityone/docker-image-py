@@ -4,6 +4,9 @@ from . import regexp
 ImageRegexps = regexp.ImageRegexps
 
 NAME_TOTAL_LENGTH_MAX = 255
+DEFAULT_DOMAIN = 'docker.io'
+LEGACY_DEFAULT_DOMAIN = 'index.docker.io'
+OFFICIAL_REPO_NAME = 'library'
 
 
 class InvalidReference(Exception):
@@ -42,23 +45,53 @@ class NameTooLong(InvalidReference):
         return cls("repository name must not be more than {} characters".format(NAME_TOTAL_LENGTH_MAX))
 
 
+class NameContainsUppercase(InvalidReference):
+    @classmethod
+    def default(cls):
+        return cls("repository name must be lowercase")
+
+
+class ReferenceHasNoName(InvalidReference):
+    pass
+
+
+class NameNotCanonical(InvalidReference):
+    @classmethod
+    def default(cls):
+        return cls("repository name must be canonical")
+
+
+class Repository(dict):
+    def __init__(self, domain, path):
+        self['domain'] = domain
+        self['path'] = path
+        super(Repository, self).__init__()
+
+    def string(self):
+        return self.name()
+
+    def name(self):
+        if not self['domain']:
+            return self['path']
+        return self['domain'] + '/' + self['path']
+
+
 class Reference(dict):
     def __init__(self, name=None, tag=None, digest=None):
         super(Reference, self).__init__()
         self['name'] = name
         self['tag'] = tag
         self['digest'] = digest
+        self.repository = Repository(*self.split_hostname())
 
     def split_hostname(self):
         name = self['name']
         matched = ImageRegexps.ANCHORED_NAME_REGEXP.match(name)
-
         if not matched:
             return '', name
         matches = matched.groups()
         if len(matches) != 2:
             return '', name
-
         return matches[0], matches[1]
 
     def string(self):
@@ -87,6 +120,8 @@ class Reference(dict):
         if '/' not in s:
             return
         hostname, _ = s.split('/', 1)
+        if '.' not in hostname:
+            return
         matched = ImageRegexps.ANCHORED_HOSTNAME_REGEXP.match(hostname)
         if not matched:
             raise ReferenceInvalidFormat.default()
@@ -97,6 +132,8 @@ class Reference(dict):
 
         matched = ImageRegexps.REFERENCE_REGEXP.match(s)
         if not matched:
+            if ImageRegexps.REFERENCE_REGEXP.match(s.lower()):
+                raise NameContainsUppercase.default()
             raise ReferenceInvalidFormat.default()
 
         matches = matched.groups()
@@ -113,6 +150,71 @@ class Reference(dict):
             raise NameEmpty.default()
 
         return r
+
+    @staticmethod
+    def _contains_any(s, chars):
+        for c in chars:
+            if c in s:
+                return True
+        return False
+
+    @classmethod
+    def split_docker_domain(cls, name):
+        i = name.find('/')
+        domain, remainder = name[:i], name[i + 1:]
+        if i == -1 or (not cls._contains_any(name, '.:') and name[:i] != 'localhost'):
+            domain, remainder = DEFAULT_DOMAIN, name
+
+        if domain == LEGACY_DEFAULT_DOMAIN:
+            domain = DEFAULT_DOMAIN
+        if domain == DEFAULT_DOMAIN and '/' not in remainder:
+            remainder = OFFICIAL_REPO_NAME + '/' + remainder
+        return domain, remainder
+
+    @classmethod
+    def parse_normalized_named(cls, s):
+        cls.try_validate(s)
+
+        matched = ImageRegexps.ANCHORED_IDENTIFIER_REGEXP.match(s)
+        if matched:
+            raise InvalidReference("invalid repository name (%s), cannot specify 64-byte hexadecimal strings" % s)
+        domain, remainder = cls.split_docker_domain(s)
+        remote_name = remainder
+        tag_sep = remainder.find(':')
+        if tag_sep > -1:
+            remote_name = remainder[:tag_sep]
+        if remote_name.lower() != remote_name:
+            raise InvalidReference("invalid reference format: repository name must be lowercase")
+
+        ref = cls.parse(domain + '/' + remainder)
+        if not ref['name']:
+            raise ReferenceHasNoName("reference %s has no name", ref.string())
+        return ref
+
+    @classmethod
+    def parse_named(cls, s):
+        named = cls.parse_normalized_named(s)
+        if named.string() != s:
+            raise NameNotCanonical.default()
+        return named
+
+    def domain(self):
+        return self.repository['domain']
+
+    def path(self):
+        return self.repository['path']
+
+    def familiar(self):
+        repo = Repository(**self.repository.copy())
+        if repo['domain'] == DEFAULT_DOMAIN:
+            repo['domain'] = ''
+            split = repo['path'].split('/')
+            if len(split) == 2 and split[0] == OFFICIAL_REPO_NAME:
+                repo['path'] = split[1]
+        return self.parse(repo.string())
+
+    def familiar_name(self):
+        return self.familiar().string()
 
 
 class NamedReference(Reference):

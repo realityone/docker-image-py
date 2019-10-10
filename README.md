@@ -5,7 +5,7 @@ Parse docker image as distribution does.
 
 ### Install
 
-You can install from PyPi.
+You can install from PyPI.
 
 ```shell
 $ pip install docker-image-py
@@ -57,6 +57,14 @@ hostname: daocloud.io, name: nginx
 ... )
 >>> print ref
 {'tag': None, 'name': 'nginx', 'digest': None}
+>>> ref = reference.Reference.parse_normalized_named(
+...     'containous/traefik'
+... )
+>>> print ref
+{'name': 'docker.io/containous/traefik', 'tag': None, 'digest': None}
+>>> hostname, name = ref.split_hostname()
+>>> print 'hostname: {}, name: {}'.format(hostname, name)
+hostname: docker.io, name: containous/traefik
 ```
 
 ## Reference

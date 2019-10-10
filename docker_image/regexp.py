@@ -72,6 +72,8 @@ class ImageRegexps(object):
         optional(literal(r':'), capture(TAG_REGEXP)),
         optional(literal(r'@'), capture(DIGEST_REGEXP))
     )
+    IDENTIFIER_REGEXP = match(r'([a-f0-9]{64})')
+    ANCHORED_IDENTIFIER_REGEXP = anchored(IDENTIFIER_REGEXP)
 
 
 class DigestRegexps(object):
