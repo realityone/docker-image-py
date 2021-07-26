@@ -162,7 +162,7 @@ class Reference(dict):
     def split_docker_domain(cls, name):
         i = name.find('/')
         domain, remainder = name[:i], name[i + 1:]
-        if i == -1 or (not cls._contains_any(name, '.:') and name[:i] != 'localhost'):
+        if i == -1 or (not cls._contains_any(name[:i], '.:') and name[:i] != 'localhost'):
             domain, remainder = DEFAULT_DOMAIN, name
 
         if domain == LEGACY_DEFAULT_DOMAIN:
