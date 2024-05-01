@@ -51,6 +51,7 @@ class TestReference(unittest.TestCase):
             create_test_case(input_='foo_bar.com:8080', repository='foo_bar.com', tag='8080'),
             create_test_case(input_='foo/foo_bar.com:8080', repository='foo/foo_bar.com', hostname='foo', tag='8080'),
             create_test_case(input_='123.dkr.ecr.eu-west-1.amazonaws.com:lol/abc:d', err=reference.ReferenceInvalidFormat),
+            create_test_case(input_='docker.artifactory.us.foo.mycompany.com/bar/node?18', err=reference.ReferenceInvalidFormat),
         ]
 
         for tc in test_cases:
@@ -159,6 +160,7 @@ class TestNormalize(unittest.TestCase):
             "docker.io/docker/Docker",
             "docker.io/docker///docker",
             "1a3f5e7d9c1b3a5f7e9d1c3b5a7f9e1d3c5b7a9f1e3d5d7c9b1a3f5e7d9c1b3a",
+            "docker.artifactory.us.foo.mycompany.com/bar/node?18"
         ]
         for name in valid_repo_names:
             ref = reference.Reference.parse_normalized_named(name)

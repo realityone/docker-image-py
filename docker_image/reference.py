@@ -7,7 +7,7 @@ NAME_TOTAL_LENGTH_MAX = 255
 DEFAULT_DOMAIN = 'docker.io'
 LEGACY_DEFAULT_DOMAIN = 'index.docker.io'
 OFFICIAL_REPO_NAME = 'library'
-
+INVALID_REF_CHARS_TABLE = {ord(i): None for i in "?[]{}~!#$%^&*()+|<>,'\""}
 
 class InvalidReference(Exception):
     @classmethod
@@ -122,6 +122,8 @@ class Reference(dict):
         hostname, _ = s.split('/', 1)
         if '.' not in hostname:
             return
+        if s.translate(INVALID_REF_CHARS_TABLE) != s:
+            raise ReferenceInvalidFormat.default()
         matched = ImageRegexps.ANCHORED_HOSTNAME_REGEXP.match(hostname)
         if not matched:
             raise ReferenceInvalidFormat.default()
