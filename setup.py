@@ -16,6 +16,10 @@ setup(
     description="Parse docker image as distribution does.",
     url='https://github.com/realityone/docker-image-py',
     packages=['docker_image'],
+    license="Apache-2.0",
+    classifiers = [
+        "License :: OSI Approved :: Apache Software License",
+    ],
     install_requires=install_requires,
     zip_safe=False,
 )
