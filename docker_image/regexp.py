@@ -1,81 +1,77 @@
 import regex
 
 
-def _quote_meta(s):
-    special_chars = frozenset("()[]{}?*+|^$\\.-#&~")
-    escape = lambda c: r'\{}'.format(c) if c in special_chars else c
-    sp = (escape(c) for c in s)
-    return r''.join(sp)
-
-
-def match(regexp):
-    return regex.compile(regexp)
-
-
-def literal(s):
-    return match(_quote_meta(s))
-
-
-def expression(*res):
-    return match(r''.join(r.pattern for r in res))
-
-
 def optional(*res):
-    return match(r'{}?'.format(group(expression(*res)).pattern))
+    return r'(?:{})?'.format(''.join(res))
 
 
-def repeated(*res):
-    return match(r'{}+'.format(group(expression(*res)).pattern))
-
-
-def group(*res):
-    return match(r'(?:{})'.format(expression(*res).pattern))
+def any_times(*res):
+    return r'(?:{})*'.format(''.join(res))
 
 
 def capture(*res):
-    return match(r'({})'.format(expression(*res).pattern))
+    return r'({})'.format(''.join(res))
 
 
 def anchored(*res):
-    return match(r'^{}$'.format(expression(*res).pattern))
+    return r'^{}$'.format(''.join(res))
+
+
+def match(regexp):
+    # Go regexp's Perl character classes are ASCII-only. Compile with ASCII
+    # semantics so borrowed patterns like `\w` reject non-ASCII tag characters.
+    return regex.compile(regexp, regex.ASCII)
+
+
+# Base patterns mirror github.com/distribution/reference/regexp.go.
+ALPHA_NUMERIC = r'[a-z0-9]+'
+SEPARATOR = r'(?:[._]|__|[-]+)'
+LOCALHOST = r'localhost'
+DOMAIN_NAME_COMPONENT = r'(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])'
+OPTIONAL_PORT = r'(?::[0-9]+)?'
+TAG = r'[\w][\w.-]{0,127}'
+DIGEST_PAT = r'[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}'
+IDENTIFIER = r'([a-f0-9]{64})'
+IPV6_ADDRESS = r'\[(?:[a-fA-F0-9:]+)\]'
+
+DOMAIN_NAME = DOMAIN_NAME_COMPONENT + any_times(r'\.' + DOMAIN_NAME_COMPONENT)
+HOST = r'(?:' + DOMAIN_NAME + r'|' + IPV6_ADDRESS + r')'
+DOMAIN_AND_PORT = HOST + OPTIONAL_PORT
+PATH_COMPONENT = ALPHA_NUMERIC + any_times(SEPARATOR + ALPHA_NUMERIC)
+REMOTE_NAME = PATH_COMPONENT + any_times(r'/' + PATH_COMPONENT)
+NAME_PAT = optional(DOMAIN_AND_PORT + r'/') + REMOTE_NAME
+REFERENCE_PAT = anchored(capture(NAME_PAT), optional(r':', capture(TAG)), optional(r'@', capture(DIGEST_PAT)))
+ANCHORED_NAME_PAT = anchored(optional(capture(DOMAIN_AND_PORT), r'/'), capture(REMOTE_NAME))
+
+# Mirrors github.com/opencontainers/go-digest.DigestRegexp.
+DIGEST_REGEXP_PATTERN = r'[a-z0-9]+(?:[.+_-][a-z0-9]+)*:[a-zA-Z0-9=_-]+'
 
 
 class ImageRegexps(object):
-    ALPHA_NUMERIC_REGEXP = match(r'[a-z0-9]+')
-    SEPARATOR_REGEXP = match(r'(?:[._]|__|[-]*)')
-    NAME_COMPONENT_REGEXP = expression(
-        ALPHA_NUMERIC_REGEXP,
-        optional(repeated(SEPARATOR_REGEXP, ALPHA_NUMERIC_REGEXP))
-    )
-    HOSTNAME_COMPONENT_REGEXP = match(r'(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])')
-    HOSTNAME_REGEXP = expression(
-        HOSTNAME_COMPONENT_REGEXP,
-        optional(repeated(literal(r'.'), HOSTNAME_COMPONENT_REGEXP)),
-        optional(literal(r':'), match(r'[0-9]+'))
-    )
-    ANCHORED_HOSTNAME_REGEXP = anchored(HOSTNAME_REGEXP)
-    TAG_REGEXP = match(r'[\w][\w.-]{0,127}')
-    ANCHORED_TAG_REGEXP = anchored(TAG_REGEXP)
-    DIGEST_REGEXP = match(r'[A-Za-z][A-Za-z0-9]*(?:[-_+.][A-Za-z][A-Za-z0-9]*)*[:][[:xdigit:]]{32,}')
-    ANCHORED_DIGEST_REGEXP = anchored(DIGEST_REGEXP)
-    NAME_REGEXP = expression(
-        optional(HOSTNAME_REGEXP, literal(r'/')),
-        NAME_COMPONENT_REGEXP,
-        optional(repeated(literal(r'/'), NAME_COMPONENT_REGEXP))
-    )
-    ANCHORED_NAME_REGEXP = anchored(
-        optional(capture(HOSTNAME_REGEXP), literal(r'/')),
-        capture(NAME_COMPONENT_REGEXP, optional(repeated(literal(r'/'), NAME_COMPONENT_REGEXP)))
-    )
-    REFERENCE_REGEXP = anchored(
-        capture(NAME_REGEXP),
-        optional(literal(r':'), capture(TAG_REGEXP)),
-        optional(literal(r'@'), capture(DIGEST_REGEXP))
-    )
-    IDENTIFIER_REGEXP = match(r'([a-f0-9]{64})')
-    ANCHORED_IDENTIFIER_REGEXP = anchored(IDENTIFIER_REGEXP)
+    ALPHA_NUMERIC_REGEXP = match(ALPHA_NUMERIC)
+    SEPARATOR_REGEXP = match(SEPARATOR)
+    NAME_COMPONENT_REGEXP = match(PATH_COMPONENT)
+    HOSTNAME_COMPONENT_REGEXP = match(DOMAIN_NAME_COMPONENT)
+    DOMAIN_NAME_REGEXP = match(DOMAIN_NAME)
+    IPV6_ADDRESS_REGEXP = match(IPV6_ADDRESS)
+    HOST_REGEXP = match(HOST)
+    OPTIONAL_PORT_REGEXP = match(OPTIONAL_PORT)
+    HOSTNAME_REGEXP = match(DOMAIN_AND_PORT)
+    DOMAIN_REGEXP = HOSTNAME_REGEXP
+    ANCHORED_HOSTNAME_REGEXP = match(anchored(DOMAIN_AND_PORT))
+    ANCHORED_DOMAIN_REGEXP = ANCHORED_HOSTNAME_REGEXP
+    TAG_REGEXP = match(TAG)
+    ANCHORED_TAG_REGEXP = match(anchored(TAG))
+    DIGEST_REGEXP = match(DIGEST_PAT)
+    ANCHORED_DIGEST_REGEXP = match(anchored(DIGEST_PAT))
+    REMOTE_NAME_REGEXP = match(REMOTE_NAME)
+    NAME_REGEXP = match(NAME_PAT)
+    ANCHORED_NAME_REGEXP = match(ANCHORED_NAME_PAT)
+    REFERENCE_REGEXP = match(REFERENCE_PAT)
+    IDENTIFIER_REGEXP = match(IDENTIFIER)
+    ANCHORED_IDENTIFIER_REGEXP = match(anchored(IDENTIFIER))
 
 
 class DigestRegexps(object):
-    DIGEST_REGEXP = match(r'[a-zA-Z0-9-_+.]+:[a-fA-F0-9]+')
-    DIGEST_REGEXP_ANCHORED = anchored(DIGEST_REGEXP)
+    DIGEST_REGEXP = match(DIGEST_REGEXP_PATTERN)
+    DIGEST_REGEXP_ANCHORED = match(anchored(DIGEST_REGEXP_PATTERN))

@@ -27,12 +27,10 @@ DIGESTS_SIZE = {
     'sha512': 64,
 }
 
+LOWER_HEX_CHARS = frozenset('0123456789abcdef')
+
 
 def validate_digest(digest):
-    matched = DigestRegexps.DIGEST_REGEXP_ANCHORED.match(digest)
-    if not matched:
-        raise InvalidDigest.default()
-
     i = digest.find(':')
     # case: "sha256:" with no hex.
     if i < 0 or ((i + 1) == len(digest)):
@@ -40,7 +38,14 @@ def validate_digest(digest):
 
     algorithm = digest[:i]
     if algorithm not in DIGESTS_SIZE:
+        matched = DigestRegexps.DIGEST_REGEXP_ANCHORED.match(digest)
+        if not matched:
+            raise InvalidDigest.default()
         raise DigestUnsupported.default()
 
-    if DIGESTS_SIZE[algorithm] * 2 != len(digest[i + 1:]):
+    encoded = digest[i + 1:]
+    if DIGESTS_SIZE[algorithm] * 2 != len(encoded):
         raise DigestInvalidLength.default()
+
+    if any(c not in LOWER_HEX_CHARS for c in encoded):
+        raise InvalidDigest.default()

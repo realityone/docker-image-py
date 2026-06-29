@@ -7,6 +7,7 @@ NAME_TOTAL_LENGTH_MAX = 255
 DEFAULT_DOMAIN = 'docker.io'
 LEGACY_DEFAULT_DOMAIN = 'index.docker.io'
 OFFICIAL_REPO_NAME = 'library'
+LOCALHOST = 'localhost'
 INVALID_REF_CHARS_TABLE = {ord(i): None for i in "?[]{}~!#$%^&*()+|<>,'\""}
 
 class InvalidReference(Exception):
@@ -85,6 +86,18 @@ class Reference(dict):
         self.repository = Repository(*self.split_hostname())
 
     def split_hostname(self):
+        """Split this already-parsed reference into raw domain and path parts.
+
+        This mirrors github.com/distribution/reference's raw splitDomain logic:
+        it uses the reference grammar captures directly and does not apply
+        Docker Hub familiar-name normalization. As a result, a syntactically
+        valid two-component name such as "containous/traefik" is split as
+        ("containous", "traefik").
+
+        Use parse_normalized_named() before calling split_hostname() when the
+        caller wants Docker CLI style behavior, where "containous/traefik"
+        becomes "docker.io/containous/traefik".
+        """
         name = self['name']
         matched = ImageRegexps.ANCHORED_NAME_REGEXP.match(name)
         if not matched:
@@ -130,6 +143,19 @@ class Reference(dict):
 
     @classmethod
     def parse(cls, s):
+        """Parse a syntactically valid Docker image reference.
+
+        This is the raw parser, matching github.com/distribution/reference.Parse.
+        It validates and captures the input according to the reference grammar,
+        then returns the most specific Reference subtype for the provided name,
+        tag, and digest.
+
+        It intentionally does not infer default Docker Hub domains or the
+        "library/" namespace. For example, "containous/traefik" is parsed as a
+        raw name whose domain capture is "containous" and path capture is
+        "traefik". Use parse_normalized_named() for Docker familiar-name
+        normalization.
+        """
         cls.try_validate(s)
 
         matched = ImageRegexps.REFERENCE_REGEXP.match(s)
@@ -139,10 +165,10 @@ class Reference(dict):
             raise ReferenceInvalidFormat.default()
 
         matches = matched.groups()
-        if len(matches[0]) > NAME_TOTAL_LENGTH_MAX:
+        ref = cls(name=matches[0], tag=matches[1])
+        if len(ref.repository['path']) > NAME_TOTAL_LENGTH_MAX:
             raise NameTooLong.default()
 
-        ref = cls(name=matches[0], tag=matches[1])
         if matches[2]:
             digest_.validate_digest(matches[2])
             ref['digest'] = matches[2]
@@ -162,9 +188,35 @@ class Reference(dict):
 
     @classmethod
     def split_docker_domain(cls, name):
-        i = name.find('/')
-        domain, remainder = name[:i], name[i + 1:]
-        if i == -1 or (not cls._contains_any(name[:i], '.:') and name[:i] != 'localhost'):
+        """Split a familiar Docker name into canonical domain and remote name.
+
+        This mirrors github.com/distribution/reference's splitDockerDomain
+        helper. It applies Docker's heuristic for deciding whether the first
+        path component is a registry domain:
+
+        * "localhost" is always a domain.
+        * "index.docker.io" is canonicalized to "docker.io".
+        * components containing "." or ":" are treated as domains.
+        * uppercase first components are treated as domains because repository
+          namespaces must be lowercase.
+        * otherwise, the default Docker Hub domain is used and the whole input
+          remains the remote name.
+
+        Single-component Docker Hub names also receive the "library/" prefix.
+        """
+        maybe_domain, sep, maybe_remote_name = name.partition('/')
+        if not sep:
+            return DEFAULT_DOMAIN, OFFICIAL_REPO_NAME + '/' + name
+
+        if maybe_domain == LOCALHOST:
+            domain, remainder = maybe_domain, maybe_remote_name
+        elif maybe_domain == LEGACY_DEFAULT_DOMAIN:
+            domain, remainder = DEFAULT_DOMAIN, maybe_remote_name
+        elif cls._contains_any(maybe_domain, '.:'):
+            domain, remainder = maybe_domain, maybe_remote_name
+        elif maybe_domain.lower() != maybe_domain:
+            domain, remainder = maybe_domain, maybe_remote_name
+        else:
             domain, remainder = DEFAULT_DOMAIN, name
 
         if domain == LEGACY_DEFAULT_DOMAIN:
@@ -175,6 +227,19 @@ class Reference(dict):
 
     @classmethod
     def parse_normalized_named(cls, s):
+        """Parse a named reference using Docker familiar-name normalization.
+
+        This mirrors github.com/distribution/reference.ParseNormalizedNamed.
+        It first rewrites familiar Docker names with split_docker_domain(), then
+        parses the canonical result with parse(). Examples:
+
+        * "ubuntu" becomes "docker.io/library/ubuntu".
+        * "containous/traefik" becomes "docker.io/containous/traefik".
+        * "example.com/repo" keeps "example.com" as the domain.
+
+        Use this method, not parse(), when user input should behave like Docker
+        CLI image names.
+        """
         cls.try_validate(s)
 
         matched = ImageRegexps.ANCHORED_IDENTIFIER_REGEXP.match(s)
@@ -186,7 +251,7 @@ class Reference(dict):
         if tag_sep > -1:
             remote_name = remainder[:tag_sep]
         if remote_name.lower() != remote_name:
-            raise InvalidReference("invalid reference format: repository name must be lowercase")
+            raise InvalidReference("invalid reference format: repository name (%s) must be lowercase" % remote_name)
 
         ref = cls.parse(domain + '/' + remainder)
         if not ref['name']:
